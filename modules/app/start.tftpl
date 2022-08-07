@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+
+EC2_AVAIL_ZONE=`curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone`
+EC2_REGION="`echo \"$EC2_AVAIL_ZONE\" | sed 's/[a-z]$//'`"
+
+sudo yum update
+sudo yum install -y unzip
+
+# SSM
+sudo yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_arm64/amazon-ssm-agent.rpm
+sudo systemctl start amazon-ssm-agent
+
+# AWS CLI
+sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/opt/awscliv2.zip"
+sudo unzip /opt/awscliv2.zip -d /opt
+sudo /opt/aws/install
+
+# Docker
+sudo amazon-linux-extras install docker
+sudo service docker start
+sudo usermod -a -G docker ec2-user
+sudo chkconfig docker
+
+docker run -p 80:80 \
+    --log-driver=awslogs \
+    --log-opt awslogs-region=$EC2_REGION \
+    --log-opt awslogs-group="/aws/ec2/${app}" \
+    --log-opt awslogs-create-group=true \
+    nginx
